@@ -34,7 +34,6 @@ const std::vector<size_t> build_bs_lut(const T *arr, size_t len, uint8_t extra_s
 	size_t lo = 0;
 	for (size_t i = 0 ; i < len - 1 ; ++i) {
 		size_t next_bucket = kf(arr[i+1]) >> shift;
-		printf("next bucket %zx\n", next_bucket);
 		if (next_bucket != bucket) {
 			assert(next_bucket > bucket && "Invalid input -- input not sorted or invalid kdf");
 			lut[bucket] = lo;
@@ -76,13 +75,36 @@ size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut,
 
 	printf("key=%x, kf(key)=%x, bucket=%zu, searching range [%zu, %zu)\n", key, keyval, bucket, l, r);
 
-	// Linear scan for small ranges.
-	for (size_t i = l ; i < r ; ++i) {
-		if (arr[i] == key)
-			return i;
+
+#if 0
+	// TODO: Linear scan for small ranges (req. benchmarks)
+	// Could maybe use LUT data as heuristic for when to switch to linear scan?
+	size_t linear_threshold = 10;
+	if (r - l <= linear_threshold) {
+		printf("Linear scan from %zu to %zu\n", l, r);
+		for (; l < r ; ++l) {
+			if (arr[l] == key)
+				return l;
+		}
+		return len;
+	}
+#endif
+
+	size_t n_probes = 0;
+	// Binary search for the left-most element.
+	while (l < r) {
+		++n_probes;
+		size_t m = l + ((r-l) >> 1);
+		// printf("Probing index %zu\n", m);
+		if (arr[m] < key)
+			l = m + 1;
+		else
+			r = m;
 	}
 
-	return len; // I think this is what std::l_b does...
+	printf("Num probes: %zu\n", n_probes);
+
+	return arr[l] == key ? l : len; // NOTE: Returns OOB if key not found, similar to std::lower_bound
 }
 
 template<typename T, typename KeyFunc = decltype(kdf<T>)>
@@ -113,7 +135,7 @@ const std::vector<T> random_array(size_t len, GenFunc && gen) {
 }
 
 int main(int argc, char *argv[]) {
-	constexpr int N = 20;
+	const int N = argc > 1 ? uint32_t(atoi(argv[1])) : 20;
 	constexpr int LBITS = 5;
 
 	// std::random_device random_device();
@@ -144,7 +166,7 @@ int main(int argc, char *argv[]) {
 		printf("LUT[%.*lx] = %04zu keys in [%zu..%zu)\n", 4, i, keys, lut[i], lut[i+1]);
 	}
 
-	uint32_t key = argc > 1 ? uint32_t(atoi(argv[1])) : input[N-7];
+	uint32_t key = argc > 2 ? uint32_t(atoi(argv[2])) : input[N-7];
 
 	auto low = std::lower_bound(begin(input), end(input), key);
 
