@@ -48,7 +48,8 @@ const std::vector<size_t> build_bs_lut(const T *arr, size_t len, uint8_t extra_s
 	}
 
 	for (size_t j = bucket ; j <= lutlen ; ++j) {
-		lut[j] = len - 1;
+		lut[j] = lo;
+		lo = len;
 		printf("Back-filled lut[%zx]=%zu\n", j, lut[j]);
 	}
 
@@ -140,7 +141,7 @@ int main(int argc, char *argv[]) {
 
 	// std::random_device random_device();
 	std::default_random_engine gen; // random_device()
-	std::uniform_int_distribution<uint32_t> dist(0, 1UL << 17); // std::numeric_limits<uint32_t>::max());
+	std::uniform_int_distribution<uint32_t> dist(0, (1UL << 17)-1); // std::numeric_limits<uint32_t>::max());
 	auto randgen = [&gen,&dist] { return dist(gen); };
 
 	auto input = random_array<uint32_t>(N, randgen);
@@ -150,8 +151,9 @@ int main(int argc, char *argv[]) {
 
 	// For unsigned integer types we could just check the maximum value (last), but it doesn't work in general due to KDF.
 	uint32_t extra_shift = array_lz(input.data(), input.size());
+	// extra_shift = 0;
 
-	for (size_t i = 0 ; i < input.size() ; ++i) {
+	for (size_t i = input.size() - 10 ; i < input.size() ; ++i) {
 		auto val = input[i];
 		printf("[%04zu] %08u (%08x -> kdf -> bucket %04x)\n", i, val, val, kdf(val) >> (sizeof(val)*8 - LBITS - extra_shift));
 	}
