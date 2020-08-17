@@ -16,8 +16,8 @@ kdf(const T& value) {
 	return value;
 };
 
-template<typename T, typename KT=T>
-std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T> && !std::is_same_v<T,bool>, KT>
+template<typename T, typename KT=std::make_unsigned<T>>
+std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T> && !std::is_same_v<T,bool>, typename KT::type>
 kdf(const T& value) {
 	return value ^ highbit<T>();
 }
