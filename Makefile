@@ -15,4 +15,4 @@ lutbs-test: lutbs-test.cpp lutbs.hpp
 .PHONY: clean bench
 
 clean:
-	rm -f lutbs-test
+	rm -f lutbs-test core core.*
