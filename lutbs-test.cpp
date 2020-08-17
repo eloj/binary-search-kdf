@@ -5,7 +5,8 @@
 	See https://github.com/eloj/binary-search-kdf
 
 	TODO:
-		Work out issues with signed/float types.
+		Work out issues with signed/float types (lz on abs for signed types?)
+		Plot number of probes in standard vs LUT search for different input sizes.
 		Benchmark
 */
 #include <cstdio>
@@ -59,26 +60,8 @@ const std::vector<size_t> build_bs_lut(const T *arr, size_t len, uint8_t extra_s
 	return lut;
 }
 
-// We'd should maybe consider packaging the lut in an opaque type with LUTBits and extra_shift, maybe a ref to the KeyFunc?
-template<typename T, typename KeyFunc = decltype(kdf<T>)>
-size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut, T key, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
-	assert(lut.size() > 0);
-	assert(lut.size() & 1);
-
-	const int LUTBits = __builtin_ctz(lut.size() & (lut.size()-1)); // Mask out lowest bit due to sentinel.
-	const uint32_t shift = ((sizeof(T) << 3) - LUTBits) - extra_shift;
-
-	printf("lut size=%zu, derived lut bits: %d, lut shift=%d\n", lut.size(), LUTBits, shift);
-
-	auto keyval = kf(key);
-	size_t bucket = keyval >> shift;
-	size_t l = lut[bucket];
-	size_t r = lut[bucket+1];
-
-	assert(l <= r);
-
-	printf("key=%x, kf(key)=%x, bucket=%zu, searching range [%zu, %zu)\n", key, keyval, bucket, l, r);
-
+template<typename T>
+static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, size_t r) {
 
 #if 0
 	// TODO: Linear scan for small ranges (req. benchmarks)
@@ -96,7 +79,8 @@ size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut,
 #endif
 
 	size_t n_probes = 0;
-	// Binary search for the left-most element.
+	// https://en.wikipedia.org/wiki/Binary_search_algorithm#Procedure_for_finding_the_leftmost_element
+	// + the standard overflow fix
 	while (l < r) {
 		++n_probes;
 		size_t m = l + ((r-l) >> 1);
@@ -108,9 +92,33 @@ size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut,
 			r = m;
 	}
 
-	printf("Num probes: %zu\n", n_probes);
+	printf("number of probes: %zu\n", n_probes);
 
-	return arr[l] == key ? l : len; // NOTE: Returns OOB if key not found, similar to std::lower_bound
+	return (len && arr[l] == key) ? l : len; // NOTE: Returns OOB if key not found, similar to std::lower_bound
+}
+
+
+// We'd should maybe consider packaging the lut in an opaque type with LUTBits and extra_shift, maybe a ref to the KeyFunc?
+template<typename T, typename KeyFunc = decltype(kdf<T>)>
+size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut, T key, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
+	assert(lut.size() > 0);
+	assert(lut.size() & 1);
+
+	const int LUTBits = __builtin_ctz(lut.size() & (lut.size()-1)); // Mask out lowest bit due to sentinel.
+	const uint32_t shift = ((sizeof(T) << 3) - LUTBits) - extra_shift;
+
+	printf("lut size=%zu, derived lut bits: %d, lut shift=%d\n", lut.size(), LUTBits, shift);
+
+	auto keyval = kf(key);
+	size_t bucket = keyval >> shift;
+	size_t l = lut[bucket];
+	size_t r = lut[bucket+1] - 1;
+
+	assert(l <= r);
+
+	printf("key=%x, kf(key)=%x, bucket=%zu, searching range [%zu, %zu]\n", key, keyval, bucket, l, r);
+
+	return lower_bound_internal(arr, len, key, l, r);
 }
 
 template<typename T, typename KeyFunc = decltype(kdf<T>)>
@@ -153,7 +161,8 @@ int main(int argc, char *argv[]) {
 
 	// std::random_device random_device();
 	std::default_random_engine gen; // random_device()
-	std::uniform_int_distribution<ArrT> dist(0, (1UL << 17)-1); // std::numeric_limits<uint32_t>::max());
+	size_t dist_scale = 1UL << 14;
+	std::uniform_int_distribution<ArrT> dist(std::numeric_limits<ArrT>::min() / dist_scale,std::numeric_limits<ArrT>::max() / dist_scale);
 	auto randgen = [&gen,&dist] { return dist(gen); };
 
 	auto input = random_array<ArrT>(N, randgen);
@@ -196,5 +205,8 @@ int main(int argc, char *argv[]) {
 	} else if (idx != size_t(low - begin(input))) {
 		printf("KEY MISMATCH ERROR!\n");
 	}
+
+	printf("Standard binary search ");
+	lower_bound_internal(input.data(), input.size(), key, 0, input.size() - 1);
 
 }
