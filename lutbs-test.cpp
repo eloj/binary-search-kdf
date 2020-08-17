@@ -22,12 +22,12 @@
 #include <vector>
 #include <array>
 
-template<typename T, typename KeyFunc = decltype(kdf<T>)>
-const std::vector<size_t> build_bs_lut(int lutbits, const T *arr, size_t len, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
+template<typename L=size_t, typename T, typename KeyFunc = decltype(kdf<T>)>
+const std::vector<L> build_bs_lut(int lutbits, const T *arr, size_t len, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
 	const size_t lutlen = 1UL << lutbits;
 	const uint32_t shift = ((sizeof(T) << 3) - lutbits) - extra_shift;
 
-	std::vector<size_t> lut(lutlen + 1); // Add one as sentinel for now.
+	std::vector<L> lut(lutlen + 1); // Add one as sentinel for now.
 
 	printf("Building %zu byte LUT<%d> with %zu entries. shift=%d, extra_shift=%d\n", sizeof(lut[0])*lut.size(), lutbits, lutlen, shift, extra_shift);
 
@@ -99,8 +99,8 @@ static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, si
 
 
 // We'd should maybe consider packaging the lut in an opaque type with LUTBits and extra_shift, maybe a ref to the KeyFunc?
-template<typename T, typename KeyFunc = decltype(kdf<T>)>
-size_t lower_bound_lut(const T* arr, size_t len, const std::vector<size_t>& lut, T key, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
+template<typename T, typename L, typename KeyFunc = decltype(kdf<T>)>
+size_t lower_bound_lut(const T* arr, size_t len, const std::vector<L>& lut, T key, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
 	assert(lut.size() > 0);
 	assert(lut.size() & 1);
 
@@ -180,7 +180,7 @@ int main(int argc, char *argv[]) {
 	}
 
 	auto lut = build_bs_lut(LBITS, input.data(), input.size(), extra_shift);
-	// auto lut = build_bs_lut(LBITS, input.data(), input.size(), extra_shift, [](const uint32_t& value){ return value; } );
+	// auto lut = build_bs_lut<uint16_t>(LBITS, input.data(), input.size(), extra_shift, [](const uint32_t& value){ return value; } );
 
 	size_t utilization = 0;
 	for (size_t i = 0 ; i < lut.size() - 1 ; ++i) {
