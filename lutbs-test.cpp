@@ -5,7 +5,9 @@
 	See https://github.com/eloj/binary-search-kdf
 
 	TODO:
-		Work out issues with signed/float types (lz on abs for signed types?)
+		Work out issues with signed/float types.
+			The optimal KDF for signed is to find how many bits are needed for the absolute values of the input, and then
+			add one bit in front for sign.
 		Plot number of probes in standard vs LUT search for different input sizes.
 		Benchmark
 */
@@ -20,7 +22,6 @@
 #include <random>
 #include <limits>
 #include <vector>
-#include <array>
 
 template<typename L=size_t, typename T, typename KeyFunc = decltype(kdf<T>)>
 const std::vector<L> build_bs_lut(int lutbits, const T *arr, size_t len, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
@@ -60,16 +61,14 @@ const std::vector<L> build_bs_lut(int lutbits, const T *arr, size_t len, uint8_t
 	return lut;
 }
 
-template<typename T>
-static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, size_t r) {
+template<typename T, typename KeyFunc = decltype(kdf<T>)>
+static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, size_t r, KeyFunc && kf = kdf) {
 
 #if 0
 	// TODO: Linear scan for small ranges (req. benchmarks)
 	// TODO: arr[l] either matches the key -- scan left to find start of range, or is smaller than key -- scan right.
-	// Could maybe use LUT data as heuristic for when to switch to linear scan?
 	size_t linear_threshold = 10;
 	if (r - l <= linear_threshold) {
-		printf("Linear scan from %zu to %zu\n", l, r);
 		for (; l < r ; ++l) {
 			if (arr[l] == key)
 				return l;
@@ -79,6 +78,7 @@ static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, si
 #endif
 
 	size_t n_probes = 0;
+	auto keyval = kf(key);
 	// https://en.wikipedia.org/wiki/Binary_search_algorithm#Procedure_for_finding_the_leftmost_element
 	// + the standard overflow fix
 	while (l < r) {
@@ -86,7 +86,7 @@ static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, si
 		size_t m = l + ((r-l) >> 1);
 		// printf("Probing index %zu\n", m);
 		assert(m < r);
-		if (arr[m] < key)
+		if (kf(arr[m]) < keyval)
 			l = m + 1;
 		else
 			r = m;
@@ -102,7 +102,7 @@ static size_t lower_bound_internal(const T* arr, size_t len, T key, size_t l, si
 template<typename T, typename L, typename KeyFunc = decltype(kdf<T>)>
 size_t lower_bound_lut(const T* arr, size_t len, const std::vector<L>& lut, T key, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
 	assert(lut.size() > 0);
-	assert(lut.size() & 1);
+	assert(lut.size() & 1); // Sentinel makes LUT size odd.
 
 	const int LUTBits = __builtin_ctz(lut.size() & (lut.size()-1)); // Mask out lowest bit due to sentinel.
 	const uint32_t shift = ((sizeof(T) << 3) - LUTBits) - extra_shift;
@@ -176,7 +176,7 @@ int main(int argc, char *argv[]) {
 
 	for (size_t i = input.size() - 10 ; i < input.size() ; ++i) {
 		auto val = input[i];
-		printf("[%04zu] %08u (%08x -> kdf -> bucket %04x)\n", i, val, val, kdf(val) >> (sizeof(val)*8 - LBITS - extra_shift));
+		printf("[%04zu] %08u (kf(%08x)=%08x -> bucket %04x)\n", i, val, val, kdf(val), kdf(val) >> (sizeof(val)*8 - LBITS - extra_shift));
 	}
 
 	auto lut = build_bs_lut(LBITS, input.data(), input.size(), extra_shift);
