@@ -2,11 +2,13 @@
 	Key-Derivation Functions
 	See also: https://github.com/eloj/radix-sorting
 */
+#include <type_traits>
 #include <algorithm>
 
 // Helper template to return an unsigned T with the MSB set.
 template<typename T>
-constexpr typename std::make_unsigned<T>::type highbit(void) {
+std::enable_if_t<std::is_integral_v<T>, typename std::make_unsigned<T>::type>
+constexpr highbit(void) {
 	return 1ULL << ((sizeof(T) << 3) - 1);
 }
 
@@ -16,8 +18,9 @@ kdf(const T& value) {
 	return value;
 };
 
-template<typename T, typename KT=std::make_unsigned<T>>
-std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T> && !std::is_same_v<T,bool>, typename KT::type>
+// The std::conditional is needed because std::make_unsigned<T> does not support non-integral types
+template<typename T, typename KT=std::conditional<std::is_integral<T>::value,std::make_unsigned<T>,std::common_type<T>>>
+std::enable_if_t<std::is_integral_v<T> && std::is_signed_v<T> && !std::is_same_v<T,bool>, typename KT::type::type>
 kdf(const T& value) {
 	return value ^ highbit<T>();
 }
