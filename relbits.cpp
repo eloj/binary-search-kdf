@@ -17,8 +17,6 @@
 
 #include "lutbs.hpp"
 
-using namespace basic_kdfs;
-
 template <typename T, typename GenFunc>
 const std::vector<T> random_array(size_t len, GenFunc && gen) {
 	std::vector<T> arr(len);
@@ -30,9 +28,9 @@ const std::vector<T> random_array(size_t len, GenFunc && gen) {
 
 // Returns a mask with bits set for the bits that are relevant after applying the KDF.
 template <
-	typename T, typename KeyFunc = decltype(kdf<T>), typename KeyType=typename std::result_of_t<KeyFunc&&(T)>
+	typename T, typename KeyFunc = decltype(basic_kdfs::kdf<T>), typename KeyType=typename std::result_of_t<KeyFunc&&(T)>
 >
-auto relevant_bits(T *arr, size_t n, KeyFunc && kf = kdf) {
+auto relevant_bits(T *arr, size_t n, KeyFunc && kf = basic_kdfs::kdf) {
 	KeyType acc_zeroes(0);
 	KeyType acc_ones(~0);
 
@@ -50,8 +48,8 @@ auto relevant_bits(T *arr, size_t n, KeyFunc && kf = kdf) {
 	return mask;
 }
 
-template <typename T, typename KeyFunc = decltype(kdf<T>)>
-void demo(T *arr, size_t n, KeyFunc && kf = kdf) {
+template <typename T, typename KeyFunc = decltype(basic_kdfs::kdf<T>)>
+void demo(T *arr, size_t n, KeyFunc && kf = basic_kdfs::kdf) {
 
 	auto mask = relevant_bits(arr, n, kf);
 
