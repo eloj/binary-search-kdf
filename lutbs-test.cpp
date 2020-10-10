@@ -23,6 +23,8 @@
 #include <limits>
 #include <vector>
 
+using namespace basic_kdfs;
+
 template<typename L=size_t, typename T, typename KeyFunc = decltype(kdf<T>)>
 const std::vector<L> build_bs_lut(int lutbits, const T *arr, size_t len, uint8_t extra_shift = 0, KeyFunc && kf = kdf) {
 	const size_t lutlen = 1UL << lutbits;
