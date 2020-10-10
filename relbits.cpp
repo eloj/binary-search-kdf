@@ -28,6 +28,7 @@ const std::vector<T> random_array(size_t len, GenFunc && gen) {
 	return arr;
 }
 
+// Returns a mask with bits set for the bits that are relevant after applying the KDF.
 template <
 	typename T, typename KeyFunc = decltype(kdf<T>), typename KeyType=typename std::result_of_t<KeyFunc&&(T)>
 >
@@ -58,13 +59,12 @@ void demo(T *arr, size_t n, KeyFunc && kf = kdf) {
 
 	// popcnt on the ~mask gives us the best 'compression' we can achieve.
 	// and could provide an 'early out'. We only care about the thresholds 8, 16 and 24 since this saves us a pass each.
-	// worst case 16-bits->8 bits: 1010101010101010 -> 0000000011111111
 	for (size_t i = 0 ; i < n ; ++i) {
 		auto value = kf(arr[i]);
 		printf("[%zu] %08x -> %08x\n", i, value, _pext_u32(value, mask));
 	}
 
-
+	printf("Max compaction: %d of %d bits\n", __builtin_popcount(~mask), std::numeric_limits<typeof(mask)>::digits);
 }
 
 int main(int argc, char *argv[]) {
@@ -73,9 +73,6 @@ int main(int argc, char *argv[]) {
 	// std::array<float,11> fa = { 128.0f, 646464.0f, 1.987654321f, 0.0f, -0.0f, -0.5f, 0.5f, -128.0f, -INFINITY, NAN, INFINITY };
 	std::array<float,6> fa = { 0.9f, 0.1f, 1.0f, 0.5f, 0.25f, 0.33333333f };
 
-	// GOAL: generate a mask + shift array to reduce a value to its 'relevant' bits.
-	// worst case there are log2(T)/2 shift/mask ops per value required.
-	// DONE: SUB-GOAL #1: Find all bit positions where all values have the same bit set or unset.
 	demo(ua.data(), ua.size());
 	demo(fa.data(), fa.size());
 
