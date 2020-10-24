@@ -1,4 +1,3 @@
-
 #include <cstdio>
 #include <cinttypes>
 #include <cstdint>
@@ -27,6 +26,7 @@ const std::vector<T> random_array(size_t len, GenFunc && gen) {
 }
 
 // Returns a mask with bits set for the bits that are relevant after applying the KDF.
+// TODO: For signed integers we could do better; the relevant bits are all minus the min redundant leading sign bits (clrsb) + 1
 template <
 	typename T, typename KeyFunc = decltype(basic_kdfs::kdf<T>), typename KeyType=typename std::result_of_t<KeyFunc&&(T)>
 >
@@ -48,21 +48,36 @@ auto relevant_bits(T *arr, size_t n, KeyFunc && kf = basic_kdfs::kdf) {
 	return mask;
 }
 
+uint32_t bucket_no(uint32_t value, uint32_t shift, uint32_t lbits) {
+	return ((value << shift) >> (32-lbits)) & ((1L << lbits)-1);
+}
+
 template <typename T, typename KeyFunc = decltype(basic_kdfs::kdf<T>)>
 void demo(T *arr, size_t n, KeyFunc && kf = basic_kdfs::kdf) {
 
 	auto mask = relevant_bits(arr, n, kf);
+	auto max_compact = __builtin_popcount(~mask);
 
 	std::cout << "mask   = " << std::bitset<std::numeric_limits<typeof(mask)>::digits>(mask) << "\n";
 
 	// popcnt on the ~mask gives us the best 'compression' we can achieve.
-	// and could provide an 'early out'. We only care about the thresholds 8, 16 and 24 since this saves us a pass each.
+	// For radix sorting this could provide an 'early out'. We only care about the thresholds 8, 16 and 24 since this saves us a pass each.
+	uint32_t bitcast;
+	uint32_t prefix_mask = 0;
 	for (size_t i = 0 ; i < n ; ++i) {
+		std::memcpy(&bitcast, arr + i, sizeof(bitcast)); // std::bit_cast<> not available
 		auto value = kf(arr[i]);
-		printf("[%zu] %08x -> %08x\n", i, value, _pext_u32(value, mask));
-	}
+		auto compact_value = _pext_u32(value, mask);
 
-	printf("Max compaction: %d of %d bits\n", __builtin_popcount(~mask), std::numeric_limits<typeof(mask)>::digits);
+		printf("[%zu] kf(%08x) -> %08x -> %08x = bucket(%d)\n", i, bitcast, value, compact_value, bucket_no(compact_value, max_compact, 9));
+		prefix_mask |= value;
+	}
+	// This is the 'naive' best shift we would get without the compaction.
+	auto max_shift = __builtin_clz(prefix_mask);
+
+	printf("Max compaction: %d of %d bits. Naive shift=%d\n", max_compact, std::numeric_limits<typeof(mask)>::digits, max_shift);
+
+	// assert(max_shift == max_compact);
 }
 
 int main(int argc, char *argv[]) {
@@ -72,6 +87,7 @@ int main(int argc, char *argv[]) {
 	std::array<float,6> fa = { 0.9f, 0.1f, 1.0f, 0.5f, 0.25f, 0.33333333f };
 
 	demo(ua.data(), ua.size());
+	demo(sa.data(), sa.size());
 	demo(fa.data(), fa.size());
 
 	return EXIT_SUCCESS;

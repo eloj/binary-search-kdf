@@ -1,18 +1,17 @@
 
 # Experiments with LUT'ed binary search in C++
 
-Instead of starting binary search with the range \[0, N), a lookup-table
+Instead of starting binary search with the range \[0, N), a small lookup-table
 is used to provide a smaller, more precise initial range.
 
 See the first [reference](#references) for a full explanation.
 
+Obviously this approach only makes sense for repeated searches over the same data.
+
 The purpose of this repo is to explore issues around building and using the LUT
 on various types of input, it is not to build a production-ready binary-search _per se_.
 
-## Issues
-
-Obviously this approach only makes sense for repeated searches over the same data,
-but that is a pretty common scenario.
+## Notes
 
 Unsigned keys work very well, especially if they're uniformly distributed.
 
@@ -21,11 +20,19 @@ by Tarjan et.al in the 1980s, neatly handles the problem of small-value keys in 
 which would otherwise distribute poorly over the LUT buckets because all the top-bits
 would be zeros.
 
-Signed keys work, but distributes poorly for (small) standard distributions because
-`extra-shift` can't handle them. I have an idea on how to solve this, by calculating
-the `extra-shift` on |key|, but this needs to be explored.
+Even better distribution can be had by applying _key-compaction_, in which we use
+parallel bit-extraction -- e.g PEXT from the [BMI2 instruction set](https://en.wikipedia.org/wiki/Bit_manipulation_instruction_set#BMI2_(Bit_Manipulation_Instruction_Set_2)) -- to
+calculate a better bucket distribution by removing irrelevant bits.
 
-Floating-point keys are so far unexplored.
+## Issues
+
+Signed keys work, but distributes poorly for (small) standard distributions because
+`extra-shift` can't handle them. The idea for improving this is to remove/ignore all
+redundant sign bits. i.e, if the input is `int32` keys, but all values fit in 18 bits,
+then treat the keys like they're `int18`.
+
+Bucket distribution issues relating to floating-point keys are not well understood
+at this time. but key-compaction seems promising.
 
 ## Related work
 
