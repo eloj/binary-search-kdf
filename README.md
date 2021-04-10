@@ -36,9 +36,14 @@ at this time. but key-compaction seems promising.
 
 ## Related work
 
-This connects to my work on [radix sorting](https://github.com/eloj/radix-sorting) in that sorting is a requirement,
-of course, and it also shares the concept of key-derivation to impose a total order of the input keys in 'unsigned space',
-which is what enables the bit-tricks used to parition the keys.
+This connects to my work on radix sorting in that sorting is a requirement, of course,
+and it also shares the concept of key-derivation to impose a total order of the input
+keys in 'unsigned space', which is what enables the bit-tricks used to parition the keys.
+
+In addition, in the radix sorting problem we care about minimizing the number of bits of key that
+we need to sort on (i.e find the _relevant bits_), in order to reduce the number of sorting passes required.
+By using something like the 'extra-shift' approach, or full key-compaction, together with
+[column-skipping](https://github.com/eloj/radix-sorting#column-skipping), improved performance can be had.
 
 ## References
 
